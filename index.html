@@ -19,10 +19,15 @@
             margin: 20px 0;
             position: relative;
         }
-        #confirmation-panel {
+        #scanner-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #confirmation {
             display: none;
-            padding: 15px;
             margin: 20px 0;
+            padding: 15px;
             border: 1px solid #ddd;
             background: #f9f9f9;
         }
@@ -35,21 +40,28 @@
             border-radius: 4px;
             cursor: pointer;
         }
+        #status {
+            margin: 10px 0;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <h1>Barcode Scanner</h1>
+    <div id="status">Ready to scan</div>
     
-    <!-- Scanner Interface -->
-    <div id="scanner-container"></div>
+    <!-- Scanner UI -->
+    <div id="scanner-container">
+        <video id="scanner-video" playsinline></video>
+    </div>
     <button id="start-button">Start Scanner</button>
     <button id="stop-button" disabled>Stop Scanner</button>
     
-    <!-- Confirmation Form -->
-    <div id="confirmation-panel">
+    <!-- Confirmation Panel -->
+    <div id="confirmation">
         <h3>Scanned Barcode:</h3>
         <p id="barcode-display"></p>
-        <form action="http://192.168.8.112:8000/scan" method="POST">
+        <form id="barcode-form" action="http://192.168.1.113:8000/scan" method="POST">
             <input type="hidden" id="barcode-input" name="barcode">
             <button type="submit">Send to PC</button>
             <button type="button" id="rescan-button">Rescan</button>
@@ -57,76 +69,97 @@
     </div>
 
     <script>
+        let scannerActive = false;
         let currentBarcode = null;
-        
+        let videoStream = null;
+
         // Initialize scanner
-        function initScanner() {
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#scanner-container'),
-                    constraints: {
+        async function initScanner() {
+            try {
+                // Request camera access
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
                         facingMode: "environment",
-                        width: 640,
-                        height: 480
-                    },
-                },
-                decoder: {
-                    readers: ["code_39_reader"]
-                }
-            }, function(err) {
-                if (err) {
-                    console.error(err);
-                    alert("Scanner initialization failed: " + err);
-                    return;
-                }
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                });
+                
+                document.getElementById('scanner-video').srcObject = videoStream;
+                document.getElementById('status').textContent = "Initializing scanner...";
+                
+                await new Promise((resolve, reject) => {
+                    Quagga.init({
+                        inputStream: {
+                            name: "Live",
+                            type: "LiveStream",
+                            target: document.querySelector('#scanner-video'),
+                            constraints: {
+                                width: 640,
+                                height: 480,
+                                facingMode: "environment"
+                            }
+                        },
+                        decoder: {
+                            readers: ["code_39_reader"]
+                        }
+                    }, err => err ? reject(err) : resolve());
+                });
+
+                Quagga.start();
+                scannerActive = true;
                 document.getElementById('start-button').disabled = true;
                 document.getElementById('stop-button').disabled = false;
-                Quagga.start();
-            });
+                document.getElementById('status').textContent = "Scanning...";
+
+            } catch (err) {
+                console.error("Scanner error:", err);
+                document.getElementById('status').textContent = "Error: " + err.message;
+                stopScanner();
+            }
         }
 
         // Stop scanner
         function stopScanner() {
-            Quagga.stop();
-            document.getElementById('start-button').disabled = false;
-            document.getElementById('stop-button').disabled = true;
+            if (scannerActive) {
+                Quagga.stop();
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                    videoStream = null;
+                }
+                scannerActive = false;
+                document.getElementById('start-button').disabled = false;
+                document.getElementById('stop-button').disabled = true;
+                document.getElementById('status').textContent = "Scanner stopped";
+            }
         }
 
         // Handle detected barcodes
         Quagga.onDetected(function(result) {
             const code = result.codeResult.code;
-            if (!currentBarcode || currentBarcode !== code) {
-                currentBarcode = code;
-                showBarcodeResult(code);
-            }
-        });
-
-        // Show barcode in confirmation panel
-        function showBarcodeResult(code) {
+            if (!code || code === currentBarcode) return;
+            
+            currentBarcode = code;
             stopScanner();
+            
+            // Show confirmation panel
             document.getElementById('barcode-display').textContent = code;
             document.getElementById('barcode-input').value = code;
-            document.getElementById('confirmation-panel').style.display = 'block';
-        }
+            document.getElementById('confirmation').style.display = 'block';
+            document.getElementById('status').textContent = "Barcode detected!";
+        });
 
         // Event listeners
         document.getElementById('start-button').addEventListener('click', initScanner);
         document.getElementById('stop-button').addEventListener('click', stopScanner);
         document.getElementById('rescan-button').addEventListener('click', function() {
-            document.getElementById('confirmation-panel').style.display = 'none';
+            document.getElementById('confirmation').style.display = 'none';
             currentBarcode = null;
+            initScanner();
         });
 
-        document.querySelector('form').addEventListener('submit', function(e) {
-        e.preventDefault(); // Temporarily prevent submission
-        const barcode = document.getElementById('barcode-input').value;
-        alert("Attempting to send: " + barcode); // Verify value is captured
-        
-        // Now proceed with submission
-        this.submit();
-    });
+        // Cleanup when page closes
+        window.addEventListener('beforeunload', stopScanner);
     </script>
 </body>
 </html>
