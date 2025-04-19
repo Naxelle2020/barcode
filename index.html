@@ -46,13 +46,13 @@
 
   Quagga.onDetected(function(result) {
     const code = result.codeResult.code;
-    document.getElementById('result').textContent = Scanned: ${code};
+    document.getElementById('result').textContent = `Scanned: ${code}`;
 
     // Prevent multiple detections
     Quagga.stop();
 
     // Send to your Java server (replace IP with your actual computer IP)
-    fetch("http://192.168.1.100:8000/", {
+    fetch("http://192.168.8.112:8000/", {
       method: "POST",
       headers: {
         "Content-Type": "text/plain"
