@@ -1,130 +1,191 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barcode Scanner</title>
+    <title>Code 39 Barcode Scanner</title>
     <script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
         }
         #scanner-container {
             width: 100%;
             height: 300px;
-            margin: 20px auto;
-            border: 2px solid #ccc;
+            border: 2px solid #333;
             position: relative;
+            margin: 20px 0;
         }
         #result {
             padding: 15px;
-            margin: 20px auto;
+            margin: 20px 0;
             border-radius: 5px;
-            font-weight: bold;
-            max-width: 80%;
+            font-size: 18px;
         }
         .new-scan {
-            background-color: #e8f5e9; /* Light green */
+            background-color: #e8f5e9;
             border: 1px solid #a5d6a7;
             color: #2e7d32;
         }
         .duplicate-scan {
-            background-color: #ffebee; /* Light red */
+            background-color: #ffebee;
             border: 1px solid #ef9a9a;
             color: #c62828;
         }
+        .error {
+            background-color: #fff3e0;
+            border: 1px solid #ffcc80;
+            color: #e65100;
+        }
         button {
-            padding: 10px 20px;
-            background-color: #4CAF50;
+            padding: 10px 15px;
+            background-color: #4285f4;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 4px;
             cursor: pointer;
-            margin: 10px;
+            margin-right: 10px;
         }
-        button:disabled {
-            background-color: #cccccc;
+        #debug {
+            font-family: monospace;
+            white-space: pre;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
         }
     </style>
 </head>
 <body>
-    <h1>Barcode Scanner</h1>
+    <h1>Code 39 Barcode Scanner</h1>
     <button id="startButton">Start Scanner</button>
     <button id="stopButton" disabled>Stop Scanner</button>
     
     <div id="scanner-container"></div>
     <div id="result">Ready to scan...</div>
+    
+    <h3>Debug Information:</h3>
+    <div id="debug"></div>
 
     <script>
-        const scannedBarcodes = new Set();
+        const debugElement = document.getElementById('debug');
         const resultDiv = document.getElementById('result');
         const startButton = document.getElementById('startButton');
         const stopButton = document.getElementById('stopButton');
+        let scannerActive = false;
+        
+        function logDebug(message) {
+            debugElement.textContent += message + '\n';
+            debugElement.scrollTop = debugElement.scrollHeight;
+        }
 
-        // Initialize scanner
         function initScanner() {
+            logDebug('Initializing scanner for Code 39...');
+            
             Quagga.init({
                 inputStream: {
                     name: "Live",
                     type: "LiveStream",
                     target: document.querySelector('#scanner-container'),
                     constraints: {
-                        facingMode: "environment"
+                        facingMode: "environment",
+                        width: 640,
+                        height: 480
                     },
                 },
                 decoder: {
-                    readers: ["ean_reader", "ean_8_reader", "code_128_reader", "upc_reader"]
+                    readers: ["code_39_reader"], // Only Code 39
+                    multiple: false
                 },
+                locate: true,
+                debug: {
+                    drawBoundingBox: true,
+                    showFrequency: true,
+                    drawScanline: true,
+                    showPattern: true
+                }
             }, function(err) {
                 if (err) {
-                    console.error(err);
-                    resultDiv.textContent = "Error starting scanner: " + err.message;
+                    logDebug('Scanner initialization error: ' + err);
+                    resultDiv.textContent = "Scanner error: " + err.message;
+                    resultDiv.className = "error";
                     return;
                 }
+                
                 Quagga.start();
+                scannerActive = true;
                 startButton.disabled = true;
                 stopButton.disabled = false;
-                resultDiv.textContent = "Scanning...";
+                resultDiv.textContent = "Scanning for Code 39 barcodes...";
+                logDebug('Scanner started successfully');
             });
         }
 
-        // Stop scanner
         function stopScanner() {
-            Quagga.stop();
-            startButton.disabled = false;
-            stopButton.disabled = true;
-            resultDiv.textContent = "Scanner stopped.";
+            if (scannerActive) {
+                Quagga.stop();
+                scannerActive = false;
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                resultDiv.textContent = "Scanner stopped";
+                logDebug('Scanner stopped');
+            }
         }
 
-        // Handle barcode detection
         Quagga.onDetected(function(result) {
             const code = result.codeResult.code;
+            logDebug('Detected barcode: ' + code + ' (Format: ' + result.codeResult.format + ')');
             
-            if (scannedBarcodes.has(code)) {
-                resultDiv.textContent = `DUPLICATE SCAN: ${code}`;
-                resultDiv.className = "duplicate-scan";
-            } else {
-                scannedBarcodes.add(code);
-                resultDiv.textContent = `NEW SCAN: ${code}`;
-                resultDiv.className = "new-scan";
-                
-                // Send to server (replace <your-PC-ip> with your actual IP)
-                fetch(`http://192.168.8.112:8000/scan`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ barcode: code })
-                })
-                .then(response => response.json())
-                .then(data => console.log("Server response:", data))
-                .catch(error => console.error("Error sending to server:", error));
+            // Validate Code 39 format
+            if (result.codeResult.format !== 'code_39') {
+                logDebug('Rejected: Not a Code 39 barcode');
+                resultDiv.textContent = "ERROR: Only Code 39 barcodes are supported";
+                resultDiv.className = "error";
+                return;
             }
+
+            resultDiv.textContent = "Scanned: " + code;
+            
+            // Send to Java server
+            fetch('http://192.168.8.112:8000/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ barcode: code })
+            })
+            .then(response => {
+                logDebug('Server response status: ' + response.status);
+                return response.json();
+            })
+            .then(data => {
+                logDebug('Server response: ' + JSON.stringify(data));
+                if (data.status === "success") {
+                    resultDiv.textContent = "NEW SCAN: " + code;
+                    resultDiv.className = "new-scan";
+                } else if (data.status === "duplicate") {
+                    resultDiv.textContent = "DUPLICATE: " + code;
+                    resultDiv.className = "duplicate-scan";
+                }
+            })
+            .catch(error => {
+                logDebug('Fetch error: ' + error);
+                resultDiv.textContent = "Network error: " + error;
+                resultDiv.className = "error";
+            });
         });
 
-        // Button event listeners
         startButton.addEventListener('click', initScanner);
         stopButton.addEventListener('click', stopScanner);
+
+        // Add keyboard shortcut (Space to start/stop)
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (scannerActive) stopScanner();
+                else initScanner();
+            }
+        });
     </script>
 </body>
 </html>
