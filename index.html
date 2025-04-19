@@ -118,6 +118,15 @@
             document.getElementById('confirmation-panel').style.display = 'none';
             currentBarcode = null;
         });
+
+        document.querySelector('form').addEventListener('submit', function(e) {
+        e.preventDefault(); // Temporarily prevent submission
+        const barcode = document.getElementById('barcode-input').value;
+        alert("Attempting to send: " + barcode); // Verify value is captured
+        
+        // Now proceed with submission
+        this.submit();
+    });
     </script>
 </body>
 </html>
