@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barcode Scanner with Confirmation</title>
+    <title>Barcode Scanner</title>
     <script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
+            max-width: 600px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -19,57 +19,45 @@
             margin: 20px 0;
             position: relative;
         }
-        #result-panel {
+        #confirmation-panel {
+            display: none;
             padding: 15px;
             margin: 20px 0;
             border: 1px solid #ddd;
-            border-radius: 5px;
             background: #f9f9f9;
-            display: none;
         }
         button {
             padding: 10px 15px;
+            margin: 5px;
             background-color: #4285f4;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin-right: 10px;
-        }
-        button:disabled {
-            background-color: #cccccc;
-        }
-        #manual-input {
-            margin-top: 20px;
-            padding: 10px;
-            border-top: 1px solid #eee;
         }
     </style>
 </head>
 <body>
     <h1>Barcode Scanner</h1>
-    <button id="startButton">Start Scanner</button>
-    <button id="stopButton" disabled>Stop Scanner</button>
     
+    <!-- Scanner Interface -->
     <div id="scanner-container"></div>
+    <button id="start-button">Start Scanner</button>
+    <button id="stop-button" disabled>Stop Scanner</button>
     
-    <div id="result-panel">
+    <!-- Confirmation Form -->
+    <div id="confirmation-panel">
         <h3>Scanned Barcode:</h3>
-        <p id="scanned-code"></p>
-        <button id="sendButton">Send to PC</button>
-        <button id="cancelButton">Cancel</button>
-    </div>
-
-    <div id="manual-input">
-        <h3>Manual Entry</h3>
-        <input type="text" id="manualBarcode" placeholder="Enter barcode manually">
-        <button id="manualSend">Send</button>
+        <p id="barcode-display"></p>
+        <form action="http://192.168.8.112:8000/scan" method="POST">
+            <input type="hidden" id="barcode-input" name="barcode">
+            <button type="submit">Send to PC</button>
+            <button type="button" id="rescan-button">Rescan</button>
+        </form>
     </div>
 
     <script>
         let currentBarcode = null;
-        const resultPanel = document.getElementById('result-panel');
-        const scannedCodeDisplay = document.getElementById('scanned-code');
         
         // Initialize scanner
         function initScanner() {
@@ -93,8 +81,8 @@
                     alert("Scanner initialization failed: " + err);
                     return;
                 }
-                document.getElementById('startButton').disabled = true;
-                document.getElementById('stopButton').disabled = false;
+                document.getElementById('start-button').disabled = true;
+                document.getElementById('stop-button').disabled = false;
                 Quagga.start();
             });
         }
@@ -102,8 +90,8 @@
         // Stop scanner
         function stopScanner() {
             Quagga.stop();
-            document.getElementById('startButton').disabled = false;
-            document.getElementById('stopButton').disabled = true;
+            document.getElementById('start-button').disabled = false;
+            document.getElementById('stop-button').disabled = true;
         }
 
         // Handle detected barcodes
@@ -117,49 +105,18 @@
 
         // Show barcode in confirmation panel
         function showBarcodeResult(code) {
-            stopScanner(); // Stop scanning when we have a result
-            scannedCodeDisplay.textContent = code;
-            resultPanel.style.display = 'block';
-        }
-
-        // Send barcode to server
-        function sendBarcode(code) {
-            const formData = new FormData();
-            formData.append('barcode', code);
-            
-            fetch('http://192.168.8.112:8000/scan', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert("Server response: " + JSON.stringify(data));
-                resultPanel.style.display = 'none';
-                currentBarcode = null;
-            })
-            .catch(error => {
-                alert("Error sending barcode: " + error);
-            });
+            stopScanner();
+            document.getElementById('barcode-display').textContent = code;
+            document.getElementById('barcode-input').value = code;
+            document.getElementById('confirmation-panel').style.display = 'block';
         }
 
         // Event listeners
-        document.getElementById('startButton').addEventListener('click', initScanner);
-        document.getElementById('stopButton').addEventListener('click', stopScanner);
-        document.getElementById('sendButton').addEventListener('click', () => {
-            if (currentBarcode) {
-                sendBarcode(currentBarcode);
-            }
-        });
-        document.getElementById('cancelButton').addEventListener('click', () => {
-            resultPanel.style.display = 'none';
+        document.getElementById('start-button').addEventListener('click', initScanner);
+        document.getElementById('stop-button').addEventListener('click', stopScanner);
+        document.getElementById('rescan-button').addEventListener('click', function() {
+            document.getElementById('confirmation-panel').style.display = 'none';
             currentBarcode = null;
-        });
-        document.getElementById('manualSend').addEventListener('click', () => {
-            const manualCode = document.getElementById('manualBarcode').value;
-            if (manualCode) {
-                showBarcodeResult(manualCode);
-                document.getElementById('manualBarcode').value = '';
-            }
         });
     </script>
 </body>
