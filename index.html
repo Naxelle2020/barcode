@@ -134,46 +134,30 @@
             }
         }
 
-        Quagga.onDetected(function(result) {
-            const code = result.codeResult.code;
-            logDebug('Detected barcode: ' + code + ' (Format: ' + result.codeResult.format + ')');
-            
-            // Validate Code 39 format
-            if (result.codeResult.format !== 'code_39') {
-                logDebug('Rejected: Not a Code 39 barcode');
-                resultDiv.textContent = "ERROR: Only Code 39 barcodes are supported";
-                resultDiv.className = "error";
-                return;
-            }
-
-            resultDiv.textContent = "Scanned: " + code;
-            
-            // Send to Java server
-            fetch('http://<YOUR-PC-IP>:8000/scan', { 
-                method: 'GET' // Simple GET test first
-            })
-            .then(response => alert('Server is reachable!'))
-            .catch(error => alert('Cannot reach server: ' + error));
-        //     .then(response => {
-        //         logDebug('Server response status: ' + response.status);
-        //         return response.json();
-        //     })
-        //     .then(data => {
-        //         logDebug('Server response: ' + JSON.stringify(data));
-        //         if (data.status === "success") {
-        //             resultDiv.textContent = "NEW SCAN: " + code;
-        //             resultDiv.className = "new-scan";
-        //         } else if (data.status === "duplicate") {
-        //             resultDiv.textContent = "DUPLICATE: " + code;
-        //             resultDiv.className = "duplicate-scan";
-        //         }
-        //     })
-        //     .catch(error => {
-        //         logDebug('Fetch error: ' + error);
-        //         resultDiv.textContent = "Network error: " + error;
-        //         resultDiv.className = "error";
-        //     });
-        // });
+       Quagga.onDetected(function(result) {
+        const code = result.codeResult.code;
+        logDebug('Detected: ' + code);
+        
+        // Use your PC's actual IP below
+        fetch('http://192.168.8.112:8000/scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ barcode: code })
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(data => {
+            logDebug('Server response: ' + JSON.stringify(data));
+            // Update UI...
+        })
+        .catch(error => {
+            logDebug('FAILED: ' + error.message);
+            resultDiv.className = "error";
+            resultDiv.textContent = "Error sending to server: " + error.message;
+        });
+    });
 
         startButton.addEventListener('click', initScanner);
         stopButton.addEventListener('click', stopScanner);
