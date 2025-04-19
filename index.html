@@ -1,55 +1,130 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barcode Scanner</title>
     <script src="https://cdn.jsdelivr.net/npm/quagga/dist/quagga.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        #scanner-container {
+            width: 100%;
+            height: 300px;
+            margin: 20px auto;
+            border: 2px solid #ccc;
+            position: relative;
+        }
+        #result {
+            padding: 15px;
+            margin: 20px auto;
+            border-radius: 5px;
+            font-weight: bold;
+            max-width: 80%;
+        }
+        .new-scan {
+            background-color: #e8f5e9; /* Light green */
+            border: 1px solid #a5d6a7;
+            color: #2e7d32;
+        }
+        .duplicate-scan {
+            background-color: #ffebee; /* Light red */
+            border: 1px solid #ef9a9a;
+            color: #c62828;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+        }
+    </style>
 </head>
 <body>
     <h1>Barcode Scanner</h1>
-    <div id="scanner-container" style="width: 100%; height: 300px;"></div>
-    <div id="result"></div>
+    <button id="startButton">Start Scanner</button>
+    <button id="stopButton" disabled>Stop Scanner</button>
     
-    <script>
-        let lastScanned = '';
-        
-        Quagga.init({
-            inputStream: {
-                name: "Live",
-                type: "LiveStream",
-                target: document.querySelector('#scanner-container'),
-                constraints: {
-                    facingMode: "environment"
-                },
-            },
-            decoder: {
-                readers: ["ean_reader", "ean_8_reader", "code_128_reader", "upc_reader"]
-            },
-        }, function(err) {
-            if (err) {
-                console.error(err);
-                return;
-            }
-            Quagga.start();
-        });
+    <div id="scanner-container"></div>
+    <div id="result">Ready to scan...</div>
 
+    <script>
+        const scannedBarcodes = new Set();
+        const resultDiv = document.getElementById('result');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+
+        // Initialize scanner
+        function initScanner() {
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#scanner-container'),
+                    constraints: {
+                        facingMode: "environment"
+                    },
+                },
+                decoder: {
+                    readers: ["ean_reader", "ean_8_reader", "code_128_reader", "upc_reader"]
+                },
+            }, function(err) {
+                if (err) {
+                    console.error(err);
+                    resultDiv.textContent = "Error starting scanner: " + err.message;
+                    return;
+                }
+                Quagga.start();
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                resultDiv.textContent = "Scanning...";
+            });
+        }
+
+        // Stop scanner
+        function stopScanner() {
+            Quagga.stop();
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            resultDiv.textContent = "Scanner stopped.";
+        }
+
+        // Handle barcode detection
         Quagga.onDetected(function(result) {
             const code = result.codeResult.code;
-            if (code !== lastScanned) {
-                lastScanned = code;
-                document.getElementById('result').innerHTML = `Scanned: ${code}`;
+            
+            if (scannedBarcodes.has(code)) {
+                resultDiv.textContent = `DUPLICATE SCAN: ${code}`;
+                resultDiv.className = "duplicate-scan";
+            } else {
+                scannedBarcodes.add(code);
+                resultDiv.textContent = `NEW SCAN: ${code}`;
+                resultDiv.className = "new-scan";
                 
-                // Send to your Java server
+                // Send to server (replace <your-PC-ip> with your actual IP)
                 fetch(`http://192.168.8.112:8000/scan`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ barcode: code })
                 })
-                .then(response => console.log('Success:', response))
-                .catch(error => console.error('Error:', error));
+                .then(response => response.json())
+                .then(data => console.log("Server response:", data))
+                .catch(error => console.error("Error sending to server:", error));
             }
         });
+
+        // Button event listeners
+        startButton.addEventListener('click', initScanner);
+        stopButton.addEventListener('click', stopScanner);
     </script>
 </body>
 </html>
