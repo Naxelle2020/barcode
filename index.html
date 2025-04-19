@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode Scanner</title>
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script> <!-- Include Pageloot scanner library -->
+</head>
+<body>
+
+    <h1>Scan a Barcode</h1>
+    <div id="scanner-container">
+        <video id="barcode-scanner"></video>
+    </div>
+
+    <script>
+        // Initialize Quagga for barcode scanning
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#barcode-scanner'),
+                constraints: {
+                    facingMode: "environment"
+                }
+            },
+            decoder: {
+                readers: ["code_39_reader"] // We will only read Code 39 barcodes
+            }
+        }, function(err) {
+            if (err) {
+                console.error(err);
+                return;
+            }
+            Quagga.start();
+        });
+
+        // Listen for barcode detection
+        Quagga.onDetected(function(result) {
+            const barcode = result.codeResult.code;
+            console.log("Scanned Barcode: ", barcode);
+
+            // Send barcode to Java server
+            sendBarcodeToServer(barcode);
+        });
+
+        // Function to send barcode data to your Java server
+        function sendBarcodeToServer(barcode) {
+            fetch('http://localhost:8000/barcode', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain',
+                },
+                body: barcode
+            })
+            .then(response => response.text())
+            .then(data => {
+                console.log("Server response: ", data);
+            })
+            .catch(error => {
+                console.error("Error sending barcode: ", error);
+            });
+        }
+    </script>
+</body>
+</html>
