@@ -149,31 +149,31 @@
             resultDiv.textContent = "Scanned: " + code;
             
             // Send to Java server
-            fetch('http://192.168.8.112:8000/scan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ barcode: code })
+            fetch('http://<YOUR-PC-IP>:8000/scan', { 
+                method: 'GET' // Simple GET test first
             })
-            .then(response => {
-                logDebug('Server response status: ' + response.status);
-                return response.json();
-            })
-            .then(data => {
-                logDebug('Server response: ' + JSON.stringify(data));
-                if (data.status === "success") {
-                    resultDiv.textContent = "NEW SCAN: " + code;
-                    resultDiv.className = "new-scan";
-                } else if (data.status === "duplicate") {
-                    resultDiv.textContent = "DUPLICATE: " + code;
-                    resultDiv.className = "duplicate-scan";
-                }
-            })
-            .catch(error => {
-                logDebug('Fetch error: ' + error);
-                resultDiv.textContent = "Network error: " + error;
-                resultDiv.className = "error";
-            });
-        });
+            .then(response => alert('Server is reachable!'))
+            .catch(error => alert('Cannot reach server: ' + error));
+        //     .then(response => {
+        //         logDebug('Server response status: ' + response.status);
+        //         return response.json();
+        //     })
+        //     .then(data => {
+        //         logDebug('Server response: ' + JSON.stringify(data));
+        //         if (data.status === "success") {
+        //             resultDiv.textContent = "NEW SCAN: " + code;
+        //             resultDiv.className = "new-scan";
+        //         } else if (data.status === "duplicate") {
+        //             resultDiv.textContent = "DUPLICATE: " + code;
+        //             resultDiv.className = "duplicate-scan";
+        //         }
+        //     })
+        //     .catch(error => {
+        //         logDebug('Fetch error: ' + error);
+        //         resultDiv.textContent = "Network error: " + error;
+        //         resultDiv.className = "error";
+        //     });
+        // });
 
         startButton.addEventListener('click', initScanner);
         stopButton.addEventListener('click', stopScanner);
